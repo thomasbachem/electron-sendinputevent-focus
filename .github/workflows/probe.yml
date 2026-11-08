@@ -1,0 +1,38 @@
+name: probe
+on: [push, workflow_dispatch]
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      CASES: focused never-shown behind-focused shown-inactive hidden-after-show minimized
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-save electron@latest
+      - name: Write the summary's table head
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('electron/package.json').version")
+          printf '### %s, Electron %s\n\n| Case | Window focused | Page focused | Visibility | Typed | Events |\n|:--|:--|:--|:--|:--|:--|\n' "$RUNNER_OS" "$VERSION" >> "$GITHUB_STEP_SUMMARY"
+      - name: Run on Linux, under Xvfb with a window manager
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb openbox libgbm1 libnss3 libasound2t64
+          Xvfb :99 -screen 0 1280x1024x24 &
+          sleep 2
+          DISPLAY=:99 openbox &
+          sleep 2
+          for c in $CASES; do DISPLAY=:99 npx electron . --no-sandbox "$c" || echo "| $c | – | – | – | – | crashed or hung (exit $?) |" >> "$GITHUB_STEP_SUMMARY"; done
+      - name: Run
+        if: runner.os != 'Linux'
+        shell: bash
+        run: |
+          for c in $CASES; do npx electron . "$c" || echo "| $c | – | – | – | – | crashed or hung (exit $?) |" >> "$GITHUB_STEP_SUMMARY"; done

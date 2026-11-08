@@ -1,0 +1,5 @@
+{
+	"name": "electron-sendinputevent-focus",
+	"private": true,
+	"main": "main.js"
+}
